@@ -54,14 +54,24 @@ class MLPPolicy(nn.Module):
         )
 
         self.discrete = discrete
+        self.ob_dim = ob_dim
+        self.ac_dim = ac_dim
 
     @torch.no_grad()
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         """Takes a single observation (as a numpy array) and returns a single action (as a numpy array)."""
         # TODO: implement get_action
-        action = None
+        assert obs.shape[0] == self.ob_dim
+        action = self.forward(ptu.from_numpy(obs))
+        if self.discrete:
+            probs = torch.softmax(action, dim=-1)
+            action = torch.distributions.Categorical(probs).sample()
+        else:
+            action = self.mean_net(obs).sample()
+            print("ac_dim:", self.ac_dim)
+            assert action.shape == (self.ac_dim,)
 
-        return action
+        return ptu.to_numpy(action)
 
     def forward(self, obs: torch.FloatTensor):
         """
@@ -69,13 +79,20 @@ class MLPPolicy(nn.Module):
         able to differentiate through it. For example, you can return a torch.FloatTensor. You can also return more
         flexible objects, such as a `torch.distributions.Distribution` object. It's up to you!
         """
+        assert obs.shape[-1] == self.ob_dim
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            pass
+            ac = self.logits_net(obs)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            pass
-        return None
+            ac_mean = self.mean_net(obs)
+            ac = torch.distributions.Normal(ac_mean, torch.exp(self.logstd))
+
+        if obs.ndim == 1:
+            assert ac.shape == (self.ac_dim,)
+        else:
+            assert ac.shape == (obs.shape[0], self.ac_dim)
+        return ac
 
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """Performs one iteration of gradient descent on the provided batch of data."""
@@ -97,7 +114,23 @@ class MLPPolicyPG(MLPPolicy):
         advantages = ptu.from_numpy(advantages)
 
         # TODO: implement the policy gradient actor update.
-        loss = None
+        print("obs", obs.shape)
+        print("actions", actions.shape)
+        print("ac_dim", self.ac_dim)
+        assert obs.shape[-1] == self.ob_dim
+
+        action_distribution = self.forward(obs)
+
+        if self.discrete:
+            log_probs = F.cross_entropy(F.log_softmax(action_distribution, dim=-1), actions)
+        else:
+            log_probs = action_distribution.log_prob(actions)
+
+        loss = -(log_probs * advantages).mean()
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
         return {
             "Actor Loss": ptu.to_numpy(loss),
