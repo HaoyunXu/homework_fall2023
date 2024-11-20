@@ -54,14 +54,23 @@ class MLPPolicy(nn.Module):
         )
 
         self.discrete = discrete
+        self.ob_dim = ob_dim
+        self.ac_dim = ac_dim
 
     @torch.no_grad()
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         """Takes a single observation (as a numpy array) and returns a single action (as a numpy array)."""
         # TODO: implement get_action
-        action = None
+        assert obs.shape[0] == self.ob_dim
+        action = self.forward(ptu.from_numpy(obs))
+        if self.discrete:
+            probs = torch.softmax(action, dim=-1)
+            action = torch.distributions.Categorical(probs).sample()
+        else:
+            action = action.sample()
+            assert action.shape == (self.ac_dim,)
 
-        return action
+        return ptu.to_numpy(action)
 
     def forward(self, obs: torch.FloatTensor):
         """
@@ -69,13 +78,15 @@ class MLPPolicy(nn.Module):
         able to differentiate through it. For example, you can return a torch.FloatTensor. You can also return more
         flexible objects, such as a `torch.distributions.Distribution` object. It's up to you!
         """
+        assert obs.shape[-1] == self.ob_dim
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            pass
+            ac = self.logits_net(obs)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            pass
-        return None
+            ac_mean = self.mean_net(obs)
+            ac = torch.distributions.Normal(ac_mean, torch.exp(self.logstd))
+        return ac
 
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """Performs one iteration of gradient descent on the provided batch of data."""
@@ -97,7 +108,21 @@ class MLPPolicyPG(MLPPolicy):
         advantages = ptu.from_numpy(advantages)
 
         # TODO: implement the policy gradient actor update.
-        loss = None
+        assert obs.shape[-1] == self.ob_dim
+
+        if self.discrete:
+            action_logits = self.forward(obs)
+            actions = actions.to(torch.int64)
+            log_probs = F.cross_entropy(action_logits, actions, reduction="none")
+        else:
+            action_distribution = self.forward(obs)
+            log_probs = -action_distribution.log_prob(actions).sum(dim=-1)
+
+        loss = (log_probs * advantages).mean()
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
         return {
             "Actor Loss": ptu.to_numpy(loss),

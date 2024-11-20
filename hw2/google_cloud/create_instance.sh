@@ -9,7 +9,7 @@ echo "Creating instance..."
 
 gcloud compute instances create $INSTANCE_NAME \
   --zone=$ZONE \
-  --image-family=pytorch-1-13-cu113-debian-11-py310 \
+  --image=pytorch-1-13-cu113-notebooks-v20240922-debian-11-py310 \
   --image-project=deeplearning-platform-release \
   --maintenance-policy=TERMINATE \
   --machine-type=n1-standard-4 \
@@ -27,6 +27,7 @@ while true; do
     break
   else
     sleep 10
+    echo "bruh"
   fi
 done
 
