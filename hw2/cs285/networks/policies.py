@@ -82,6 +82,7 @@ class MLPPolicy(nn.Module):
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
             ac = self.logits_net(obs)
+            ac = torch.distributions.Categorical(ac)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
             ac_mean = self.mean_net(obs)
@@ -111,12 +112,16 @@ class MLPPolicyPG(MLPPolicy):
         assert obs.shape[-1] == self.ob_dim
 
         if self.discrete:
-            action_logits = self.forward(obs)
-            actions = actions.to(torch.int64)
-            log_probs = F.cross_entropy(action_logits, actions, reduction="none")
+            action_distribution = self.forward(obs)
+            # We use negative log probability because we want to maximize the probability 
+            # (minimize negative log probability) of actions that led to high advantages
+            log_probs = -action_distribution.log_prob(actions)
         else:
             action_distribution = self.forward(obs)
-            log_probs = -action_distribution.log_prob(actions).sum(dim=-1)
+            # For continuous actions, each dimension of the action has its own probability distribution
+            # We need to sum across dimensions to get the total log probability of the full action vector
+            # While for discrete actions, there is just one categorical distribution for the single discrete choice
+            log_probs = -action_distribution.log_prob(actions).sum(dim=1)
 
         loss = (log_probs * advantages).mean()
 
