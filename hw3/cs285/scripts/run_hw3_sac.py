@@ -23,6 +23,9 @@ from scripting_utils import make_logger, make_config
 
 import argparse
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
     # set random seeds
@@ -68,7 +71,7 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
             action = env.action_space.sample()
         else:
             # TODO(student): Select an action
-            action = ...
+            action = agent.get_action(observation)
 
         # Step the environment and add the data to the replay buffer
         next_observation, reward, done, info = env.step(action)
@@ -90,12 +93,15 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
         # Train the agent
         if step >= config["training_starts"]:
             # TODO(student): Sample a batch of config["batch_size"] transitions from the replay buffer
-            batch = ...
-            update_info = ...
+            batch = ptu.from_numpy(
+                replay_buffer.sample(config["batch_size"]))
+            update_info = agent.update(batch["observations"], batch["actions"],
+                                       batch["rewards"], batch["next_observations"], batch["dones"], step)
 
             # Logging
             update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
-            update_info["critic_lr"] = agent.critic_lr_scheduler.get_last_lr()[0]
+            update_info["critic_lr"] = agent.critic_lr_scheduler.get_last_lr()[
+                0]
 
             if step % args.log_interval == 0:
                 for k, v in update_info.items():
@@ -148,8 +154,10 @@ def main():
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
 
     parser.add_argument("--eval_interval", "-ei", type=int, default=5000)
-    parser.add_argument("--num_eval_trajectories", "-neval", type=int, default=10)
-    parser.add_argument("--num_render_trajectories", "-nvid", type=int, default=0)
+    parser.add_argument("--num_eval_trajectories",
+                        "-neval", type=int, default=10)
+    parser.add_argument("--num_render_trajectories",
+                        "-nvid", type=int, default=0)
 
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--no_gpu", "-ngpu", action="store_true")
