@@ -253,10 +253,7 @@ class SoftActorCritic(nn.Module):
         except (AttributeError, NotImplementedError):
             # Approximate entropy using samples
             actions = action_distribution.rsample((100,))
-            if self.action_dim > 1:
-                log_probs = action_distribution.log_prob(actions).sum(dim=-1)
-            else:
-                log_probs = action_distribution.log_prob(actions)
+            log_probs = action_distribution.log_prob(actions)
             return -log_probs.mean(dim=0)
 
     def actor_loss_reinforce(self, obs: torch.Tensor):
@@ -291,10 +288,7 @@ class SoftActorCritic(nn.Module):
 
         # Do REINFORCE: calculate log-probs and use the Q-values
         # TODO(student)
-        if self.action_dim > 1:
-            log_probs = action_distribution.log_prob(action).sum(dim=-1)
-        else:
-            log_probs = action_distribution.log_prob(action)
+        log_probs = action_distribution.log_prob(action)
         assert log_probs.shape == advantage.shape, log_probs.shape
         loss = -torch.mean(log_probs * advantage)
 
