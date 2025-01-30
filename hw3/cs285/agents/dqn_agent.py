@@ -73,7 +73,7 @@ class DQNAgent(nn.Module):
             if self.use_double_q:
                 next_action = self.critic(next_obs).argmax(dim=-1)
             else:
-                next_action = self.target_critic(next_obs).argmax(dim=-1)
+                next_action = next_qa_values.argmax(dim=-1)
             
             next_q_values = next_qa_values.gather(dim=-1, index=next_action.unsqueeze(-1)).squeeze(-1)
             target_values = reward + self.discount * next_q_values * torch.logical_not(done)

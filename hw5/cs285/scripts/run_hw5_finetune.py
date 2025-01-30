@@ -22,7 +22,8 @@ from scripting_utils import make_logger, make_config
 from run_hw5_explore import visualize
 
 MAX_NVIDEO = 2
-
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
     # set random seeds

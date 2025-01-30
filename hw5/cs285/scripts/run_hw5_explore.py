@@ -1,3 +1,4 @@
+import warnings
 import time
 import argparse
 import pickle
@@ -21,7 +22,7 @@ from cs285.infrastructure.replay_buffer import ReplayBuffer
 from scripting_utils import make_logger, make_config
 
 MAX_NVIDEO = 2
-
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def visualize(env: Pointmass, agent, observations: torch.Tensor):
     import matplotlib.pyplot as plt

@@ -7,10 +7,12 @@ from typing import Callable, List, Tuple
 from cs285.agents.dqn_agent import DQNAgent
 import cs285.infrastructure.pytorch_util as ptu
 
+
 def init_network(model):
     if isinstance(model, nn.Linear):
         model.weight.data.normal_()
         model.bias.data.normal_()
+
 
 class RNDAgent(DQNAgent):
     def __init__(
@@ -41,12 +43,16 @@ class RNDAgent(DQNAgent):
             self.rnd_net.parameters()
         )
 
+        self.rnd_loss = nn.MSELoss()
+
     def update_rnd(self, obs: torch.Tensor) -> torch.Tensor:
         """
         Update the RND network using the observations.
         """
         # TODO(student): update the RND network
-        loss = ...
+        predictions = self.rnd_net(obs)
+        targets = self.rnd_target_net(obs)
+        loss = self.rnd_loss(predictions, targets)
 
         self.rnd_optimizer.zero_grad()
         loss.backward()
@@ -65,11 +71,16 @@ class RNDAgent(DQNAgent):
     ):
         with torch.no_grad():
             # TODO(student): Compute RND bonus for batch and modify rewards
-            rnd_error = ...
+            predictions = self.rnd_net(next_observations)
+            targets = self.rnd_target_net(next_observations)
+            rnd_error = torch.norm(predictions - targets, dim=-1)
+            # Normalize rnd error
+            rnd_error = (rnd_error - rnd_error.mean()) / (rnd_error.std() + 1e-8)
             assert rnd_error.shape == rewards.shape
-            rewards = ...
+            rewards = rewards + self.rnd_weight * rnd_error
 
-        metrics = super().update(observations, actions, rewards, next_observations, dones, step)
+        metrics = super().update(observations, actions,
+                                 rewards, next_observations, dones, step)
 
         # Update the RND network.
         rnd_loss = self.update_rnd(observations)
@@ -79,7 +90,7 @@ class RNDAgent(DQNAgent):
 
     def num_aux_plots(self) -> int:
         return 1
-    
+
     def plot_aux(
         self,
         axes: List,
@@ -97,7 +108,8 @@ class RNDAgent(DQNAgent):
             y = torch.linspace(0, 1, 100)
             xx, yy = torch.meshgrid(x, y)
 
-            inputs = ptu.from_numpy(np.stack([xx.flatten(), yy.flatten()], axis=1))
+            inputs = ptu.from_numpy(
+                np.stack([xx.flatten(), yy.flatten()], axis=1))
             targets = self.rnd_target_net(inputs)
             predictions = self.rnd_net(inputs)
 
@@ -106,5 +118,6 @@ class RNDAgent(DQNAgent):
 
             # Log scale, aligned with normal axes
             from matplotlib import cm
-            ax.imshow(ptu.to_numpy(errors).T, extent=[0, 1, 0, 1], origin="lower", cmap="hot")
+            ax.imshow(ptu.to_numpy(errors).T, extent=[
+                      0, 1, 0, 1], origin="lower", cmap="hot")
             plt.colorbar(ax.images[0], ax=ax)

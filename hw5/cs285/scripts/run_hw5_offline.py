@@ -24,7 +24,8 @@ from cs285.infrastructure.replay_buffer import MemoryEfficientReplayBuffer, Repl
 from scripting_utils import make_logger, make_config
 
 MAX_NVIDEO = 2
-
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
     # set random seeds
